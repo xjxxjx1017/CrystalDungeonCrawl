@@ -1,0 +1,10 @@
+{
+  "id": 0,
+  "title": "Noname",
+  "description": "",
+  "author": "",
+  "version": "1.0",
+  "genre": "",
+  "url": "",
+  "strategies": [ "batch_map" ]
+}

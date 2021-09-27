@@ -1,0 +1,16 @@
+{
+  "width": 960,
+  "height": 640,
+  "count": 1,
+  "data": [
+    {
+      "x": 0,
+      "y": 0,
+      "width": 960,
+      "height": 640,
+      "interval": 0.25,
+      "key": "idle"
+    }
+  ],
+  "ref": "res/background_mask2.png"
+}

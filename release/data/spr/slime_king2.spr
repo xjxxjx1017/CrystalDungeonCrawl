@@ -1,0 +1,64 @@
+{
+  "width": 96,
+  "height": 96,
+  "count": 7,
+  "data": [
+    {
+      "x": 0,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": "idle"
+    },
+    {
+      "x": 96,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": ""
+    },
+    {
+      "x": 192,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": ""
+    },
+    {
+      "x": 288,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": ""
+    },
+    {
+      "x": 384,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": ""
+    },
+    {
+      "x": 480,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": ""
+    },
+    {
+      "x": 576,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": ""
+    }
+  ],
+  "ref": "res/slime king 4 pic2.png"
+}

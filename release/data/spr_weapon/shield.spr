@@ -1,0 +1,16 @@
+{
+  "width": 96,
+  "height": 96,
+  "count": 1,
+  "data": [
+    {
+      "x": 0,
+      "y": 0,
+      "width": 96,
+      "height": 96,
+      "interval": 0.25,
+      "key": "idle"
+    }
+  ],
+  "ref": "res/weapon/shield_def_0001.png"
+}

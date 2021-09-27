@@ -1,0 +1,16 @@
+{
+  "width": 128,
+  "height": 128,
+  "count": 1,
+  "data": [
+    {
+      "x": 0,
+      "y": 0,
+      "width": 128,
+      "height": 128,
+      "interval": 0.25,
+      "key": "idle"
+    }
+  ],
+  "ref": "res/test.png"
+}
