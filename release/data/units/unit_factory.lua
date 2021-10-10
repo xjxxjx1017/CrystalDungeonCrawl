@@ -43,13 +43,18 @@ UnitDef = {
     CRYSTAL2B = { id = 3,
         cfg = { img = 'crystal2b', layer = 9, blocking = true, can_player_attack = true, hp = 1, dropImg = 'crystal5', crystal = 1 + gain } },
 
-    SWORD = { id = 20,
-        cfg = { img = 'sword', layer = 9, pickup_equipment = '白板武器', is_pickup = true } },
+    RANDOM_WEAPON = { id = 20,
+        cfg = { img = 'sword', layer = 9, pickup_equipment_random = true, is_pickup = true, red_barrier = 5, blocking = true, can_player_attack = true, hp = 1 } },
+
     SHIELD = { id = 22,
         cfg = { img = 'shield_white', layer = 9, pickup_equipment = '白板护盾', is_pickup = true } },
     BADGE = { id = 38,
         cfg = { img = 'badge_white', layer = 9, pickup_equipment = '白板徽章', is_pickup = true } },
 
+    SCRIPT = {
+        id = 55,
+        cfg = { img = 'script', layer = 9, pickup_script_random = true, is_pickup = true },
+    },
 
     -- 蜘蛛网, 这个地形会stun玩家。被踩两次后会消失。
     SPIDER_WEB = { id = 134,
@@ -82,30 +87,31 @@ UnitDef = {
     TOWER_TECH = { id = 101,
         cfg = { img = 'tower_tech', layer = 9, blocking = true, can_player_attack = true, hp = 5, dropImg = 'crystal5', crystal = 5 + gain * 3, light_range = 2 } },
 
-    PILLAR_HEAL = { id = 101,
-        cfg = { img = 'tower_tech', layer = 9, blocking = true, can_player_attack = true, hp = 5, dropImg = 'crystal5', crystal = 5 + gain * 3, light_range = 2 } },
+    PILLAR_HEAL = { id = 99,
+        cfg = { img = 'pillar_slime', layer = 9, blocking = true, can_player_attack = true, hp = 5, dropImg = 'crystal5', crystal = 5 + gain * 3, light_range = 2, stepLoop = 5,
+        ai=AI_HEAL_SURROUNDING, att_range = 1, att_img = 'blunt', att = 5 } },
 
     BLUE_COIN = { id = 100,
-    cfg = { img = 'blue_coin', layer = 9, blocking = true, can_player_attack = true, hp = 1, dropImg = 'crystal5', shield = 20 } },
+        cfg = { img = 'blue_coin', layer = 9, blocking = true, can_player_attack = true, hp = 1, dropImg = 'crystal5', crystal = 10, crystal_drop_only = 'crystal1' } },
 
     -- 露天水晶矿
     CRYSTAL_ORE = { id = 1, 
         cfg = { img = 'crystal_ore', layer = 9, blocking = true, can_player_attack = true, hp = 5, dropImg = 'crystal5', crystal = 5 + gain * 3, light_range = 1.2 } },
 
     POT_STONE = {
-        id = 169, cfg = { img = 'stone_pot', layer = 9, blocking = true, can_player_attack = true, hp = 2, no_shield_block = true, dropImg = 'crystal5', crystal = 0, crystal_collector = true }
+        id = 169, cfg = { img = 'stone_pot', layer = 9, blocking = true, can_player_attack = true, hp = 2, no_shield_block = true, dropImg = 'crystal5', crystal = 0, crystal_collector = true, collector_range = 3 }
     },
 
     -- 毛刺陷阱，起落起落，在其升起的时候，可以看用攻击消灭
     SPIKE = { id = 135,
-        cfg = { img = 'spike', layer = 10, blocking = true, att = 10, att_img = 'blunt', dropImg = 'crystal1',   
-        ai = AI_StepOnShow, hide_max = 3, show = 2, show_max = 2, walked_on_damage = true,
+        cfg = { img = 'spike', layer = 10, blocking = true, att = 10, att_img = 'blunt', dropImg = 'crystal1', walked_on_damage = true, att_effect_stun = 3,   
+        ai = AI_ShowHide, hide_max = 5, show = 2, show_max = 2,
         analysis_hit_chance = 0.7, analysis_ambush_chance = 1.5 } },
         
     -- 发现玩家后，直线冲过去，直到碰到障碍物
     ROCK = { id = 102,
-        cfg = { img = 'rock', layer = 10, blocking = true, alarm_range = 2, width = 1, height = 1, att_trample = 10, att_trample_max = 2, att_trample_stun = 1, 
-        att = 10, att_img = 'blunt', att_terrain = 5, dropImg = 'crystal2', ai = AI_Charge,
+        cfg = { img = 'rock', layer = 10, blocking = true, can_player_attack = true, alarm_range = 3, att_trample = 10, att = 10, att_trample_max = 999, att_trample_stun = 1, hp = 999,
+        att_img = 'blunt', dropImg = 'crystal2', ai = AI_WONDER_DIR_BACKANDFORTH, aiLazy = true,
         analysis_hit_chance = 0.4, analysis_ambush_chance = 0.5 } }
 }
 
@@ -162,10 +168,12 @@ for i = 1,10 do
 end
 -- 有护甲的怪
 UnitDef['ROCK_MAN'] = { id = 103,
-    cfg = { img = 'rock_man', layer = 10, blocking = true, can_player_attack = true, hp = 10, alarm_range = 1, width = 1, height = 1, att_trample = 10, att_trample_max = 1, att_trample_stun = 1, 
-    att = 10, att_img = 'blunt', att_terrain = 5, dropImg = 'crystal2', ai = AI_Charge, level = {} } }
+    cfg = { img = 'rock_man', layer = 10, blocking = true, can_player_attack = true, hp = 3, dropImg = 'crystal1', crystal = 3, 
+    att_img = 'blunt', is_stationary = false,
+    ai = AI_Wonder, aiPath = { { x = -1, y = 0 }, { x = 1, y = 0 }, { x = 1, y = 0 }, { x = -1, y = 0 }, { x = 0, y = 0 }, 
+    { x = 0, y = -1 }, { x = 0, y = 1 }, { x = 0, y = 1 }, { x = 0, y = -1 }, { x = 0, y = 0 } } , level = {} } }
 for i = 1,10 do
-    table.insert( UnitDef['ROCK_MAN'].cfg.level, { hp = 2 + i, att = 2 + i, crystal = 2 + gain + i } )
+    table.insert( UnitDef['ROCK_MAN'].cfg.level, {hp = 2 + i, att = 2 + i, crystal = 2 + gain + i } )
 end
 
 -- 时不时会躲起来，时不时又会冒出来的地鼠。玩家在它埋在地下的时候，靠近会受到攻击
@@ -194,7 +202,7 @@ end
 -- 狼gang，墨镜西装。喜欢围殴。
 UnitDef['WOLF_GANG'] = { id = 115,
     cfg = { img = 'wolf_gang', layer = 10, blocking = true, can_player_attack = true, hp = 20, att = 12, dropImg = 'crystal2', crystal = 40, is_stationary = false,
-    ai = AI_GANG_TRACKER, att_img = 'blunt', alarm_ally_range = 2,
+    ai = AI_GANG_TRACKER, att_img = 'blunt', alarm_ally_range = 2, aiLazy = true,
     analysis_hit_chance = 1, analysis_ambush_chance = 0 , level = {} } }
 for i = 1,10 do
     table.insert( UnitDef['WOLF_GANG'].cfg.level, { hp = 0 + i, att = 1 + i, crystal = gain + i } )
@@ -259,12 +267,14 @@ Config_Base = {
     is_tile = false, -- 该属性为false的单位在生成的时候不能overlap
     tile_family = nil, -- 根据周围同种类地块，应用地块渲染的边角逻辑
     is_bullet = false, -- 该属性为true的单位在生成的时候可以overlap，无视is_tile属性
-    hp = 0, shield = 0, shield_max = 0, sheild_generate = 0, no_shield_block = false, 
-    att = 0, att_terrain = 0, att_img = '', att_effect_stun = 0, att_self_damage = 0,
+    hp = 0, maxHp = 0, shield = 0, shield_max = 0, sheild_generate = 0, no_shield_block = false, red_barrier = 0,
+    att = 0, att_terrain = 0, att_img = '', att_effect_stun = 0, att_self_damage = 0, att_range = 0,
+    extra_att = 0, hard_def = 0, extra_hp = 0,
     dropImg = nil, crystal = 0, crystal_white = false,
     width = 1, height = 1, shape = { x = 0, y = 0 }, 
     stun = 0, att_self_stun_max = 0, move_self_stun_max = 0, att_trample = 0, att_trample_max = 0, att_trample_stun = 0,
     alarmed = false, alarm_range = 0, alarm_ally_range = 0,
+    stepLoop = 0, curStep = 0, -- a step counter for the unit, can use to serve AI actions that follow a cycle or loop.
     curDx = 0, curDy = 0, -- moving in current directing, two 0 means not moving in current direction
     aiLazy = false, aiPath = {}, aiStep = 0, aiStepDir = 1,-- the step that AI is on currently
     aiX = 0, aiY = 0, -- the tile where the unit is supposed to center its AI on
@@ -273,11 +283,12 @@ Config_Base = {
     hide = 0, hide_max = 0, show = 0, show_max = 9999,
     blink_range_min = 0, blink_range_max = 0,
     walked_on_damage = false,
-    parts = {}, owner = nil, child = {}, parent = nil, max_child = 0, child_id = -1, born_interval = 1, born = 0, hasParent = false, 
+    parts = {}, owner = nil, child = {}, parent = nil, max_child = 0, child_id = -1, born_interval = 0, born = 0, hasParent = false, 
     summon_monster_white = nil, die_summon = false, summon_level = 0, summon_count = 0,
     seen = false, light_range = 0, isGridBase = true,
-    crystal_collector = false, crystal_collected = copy( CRYSTALS ),-- crystal collector will attract all the crystals around
-    pickup_equipment = nil,
+    crystal_collector = false, crystal_collected = copy( CRYSTALS ), collector_range = 0, -- crystal collector will attract all the crystals around
+    crystal_drop_only = nil, -- specify one crystal color that this unit will drop
+    pickup_equipment = nil, pickup_equipment_random = false, pickup_script_random = false,
     is_drop_badge = false, -- whether will drop a blank badge for special skills
     -- analysis fields
     analysis_hit_chance = 0,   -- how easy is it for this unit to attack the player

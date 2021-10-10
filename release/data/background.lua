@@ -14,6 +14,7 @@ Background = class({
     background = nil,
 
     reset = function(self)
+	--[[
 		self.backgroundObjectList = {}
         self.background = Resources.load( mapCfg.background )
         local xOffset = ( MapTile_WH - 16 ) * -0.5 * 32
@@ -31,15 +32,16 @@ Background = class({
                     table.insert( self.backgroundObjectList, o )
                 end
             end
-        end
+        end]]
     end,
 
     update = function(self, delta)
+	--[[
         for k,v in ipairs( self.backgroundObjectList ) do
             if game:isInCamera( v ) then
                 v:render( delta )
             end
-        end
+        end]]
     end
 
 }, object)

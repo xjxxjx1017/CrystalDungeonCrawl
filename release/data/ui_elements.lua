@@ -26,7 +26,7 @@ local texUI_crystal_coin = Resources.load('res/crystal_coin.png')
 
 P = beGUI.percent -- Alias of percent.
 
-adjust = { 32, 32 }
+-- adjust = {150, 200, 200, 50, 0, 0, 50, -25 }
 
 UI_DebugConsole = class({
     widget = nil,
@@ -94,6 +94,7 @@ UI_ShowNumber = function( sprX, sprY, n, zoom, color )
         color = Color.new(255, 255, 255)
     end
 	if n == nil then return end
+    if type(obj) == 'table' then Debug.trace() end
     if n > 100 then
         tex( texUI_numbers, sprX - 5 * zoom, sprY, 5 * zoom, 7 * zoom, math.floor( n / 100 ) * 5, 0, 5, 7, 0, Vec2.new(0.5, 0.5), false, false, color )
         tex( texUI_numbers, sprX, sprY, 5 * zoom, 7 * zoom, math.floor( ( n % 100 )/10) * 5, 0, 5, 7, 0, Vec2.new(0.5, 0.5), false, false, color )
@@ -106,11 +107,12 @@ UI_ShowNumber = function( sprX, sprY, n, zoom, color )
     end
 end
 
-UI_Equipment_Render = function( x, y, w, h, cfg, res, iconResIndex, number, barResX, barResY, barValue, barMax )
-    local adjust = {32, 26, 7, 8, -46, 8, 4, 0, 2.5, -18, -20, 73, 90, -6}
+UI_Equipment_Render = function( x, y, w, h, cfg, res, iconResIndex, number, barResX, barResY, barValue, barMax, callback )
+    local adjust = {32, 26, 7, 8, -46, 
+        8, 4, 0, 2.5, -18, 
+        -20, 73, -6, -6}
     x = x + adjust[7]
     y = y + adjust[8]
-    local p = barValue / barMax
     -- show equipment icon
     spr( res, x, y, w, h )
     -- show the right down corner icon
@@ -118,19 +120,22 @@ UI_Equipment_Render = function( x, y, w, h, cfg, res, iconResIndex, number, barR
         tex( texUI_tile_ui, x + adjust[1], y + adjust[2], 64, 64, 32 * iconResIndex, 0, 32, 32 )
         UI_ShowNumber( x + 64 + adjust[3], y + 64 + adjust[4], number, 2 )
     end
-    -- show number
-    UI_ShowNumber( x + adjust[11], y + adjust[12], barMax, 2 )
-    UI_ShowNumber( x + adjust[11], y + adjust[12] + adjust[10], barValue, 2 )
-    -- show the bar
-    tex( texUI_bank7_ui, x + adjust[5], y + adjust[6] + 32 * (1 - p) * adjust[9], 32, 32 * adjust[9] * p, 
-        32 * barResX, barResY * 32 + 32 * (1 - p) * 3, 32, 32 * 3 * p )
+    if barMax > 0 then
+        -- show number
+        UI_ShowNumber( x + adjust[11], y + adjust[12], barMax, 2 )
+        UI_ShowNumber( x + adjust[11], y + adjust[12] + adjust[10], barValue, 2 )
+        -- show the bar
+        local p = barValue / barMax
+        tex( texUI_bank7_ui, x + adjust[5], y + adjust[6] + 32 * (1 - p) * adjust[9], 32, 32 * adjust[9] * p, 
+            32 * barResX, barResY * 32 + 32 * (1 - p) * 3, 32, 32 * 3 * p )
+    end
 
     -- mouse hover event
-    UI_Clickable( Rect.new( x, y, x + w, y + h ), Rect.new( x, y + adjust[13], x + w + adjust[14], y + 3 + adjust[13] ), 
+    UI_Clickable( Rect.new( x, y, x + w, y + h ), Rect.new( x, y + h + adjust[13], x + w + adjust[14], y + 3 + h + adjust[13] ), 
     function()
         -- print('itemdetails', '', cfg.id)
         ui_itemDetail.curDetail = cfg
-    end, nil )
+    end, callback )
 end
 
 UI_Buy_Render = function( x, y, iconResIndexX, iconResIndexY, priceResIndexX, priceResIndexY, cost, canAfford, canPayPartial )
@@ -157,8 +162,9 @@ UI_Icon_Render = function( x, y, iconResIndexX, iconResIndexY, w, h )
     tex( texUI_bank7_ui, x, y, 32 * w, 32 * h, iconResIndexX * 32 , iconResIndexY * 32, 32 * w, 32 * h )
 end
 
-UI_Clickable = function( clickArea, highlightArea, onHover, onClick )
-    local xx, yy, tb1 = mouse(1)
+UI_Clickable = function( clickArea, highlightArea, onHover, onClick, priority )
+    if priority == nil then priority = MOUSE_PRIORITY_UI end
+    local xx, yy, tb1 = mouseManager:getMouse( priority )
     if xx > clickArea.x0 and xx < clickArea.x1 and yy > clickArea.y0 and yy < clickArea.y1 then
         if onHover ~= nil then
             onHover()
@@ -169,6 +175,19 @@ UI_Clickable = function( clickArea, highlightArea, onHover, onClick )
             onClick()
         end
         blend()
+    end
+end
+
+UI_Choices_Default = {
+    text = 'Choice Text',
+    callback = nil,
+}
+UI_Choices = function( choices )
+    local adjust = {150, 200, 200, 50, 0, 0, 50, -25 }
+    rect( 0, 0, totalW, totalH, true, Color.new(0, 0, 0, 180 ) )
+    UI_Title( -2, game.choicesTitle )
+    for k,v in ipairs( choices ) do
+        UI_MenuButton( k - 2, v.text, v.callback, MOUSE_PRIORITY_POPUP )
     end
 end
 
@@ -278,7 +297,7 @@ UI_ItemList = class({
             end,
             function()
                 if (( isNew or isUpgrade ) and canAfford) or isSwitchable  then
-                    game:upgradeEquipment( cfg, isSwitchable )
+                    game:upgradeEquipment( cfg, isSwitchable, false, true )
                     game.player:changeState()
                     self:update()
                     game.player.stun = game.player.stun + 3
@@ -292,7 +311,7 @@ UI_ItemList = class({
     update = function( self )
         local fullList = {}
         local fullIds = {}
-        local equipped = { game.weapon.cfg.id, game.shield.cfg.id }
+        local equipped = { game.weaponMain.cfg.id, game.shield.cfg.id }
         if game.badge ~= nil then table.insert( equipped, game.badge.cfg.id ) end
         local crafted, craftedLevelUp, levelUpMissed = game:filterEquipmentByCrafted()
     
@@ -433,11 +452,12 @@ UI_RenderCrystals = function( x, y, currency )
     end
 end
 
-UI_MenuButton = function( row, txt, onClick)
+UI_MenuButton = function( row, txt, onClick, priority)
     local adjust = {192, 32, 32, 192, 32 + 3, 325, 250, 50 }
     local x, y = adjust[6], adjust[7]
     text( txt, x, y + row * adjust[8] )
-    UI_Clickable( Rect.new( x, y + row * adjust[8], x + adjust[1], y + row * adjust[8] + adjust[2] ), Rect.new( x, y + row * adjust[8] + adjust[3], x + adjust[4], y + row * adjust[8] + adjust[5] ), nil, onClick )
+    UI_Clickable( Rect.new( x, y + row * adjust[8], x + adjust[1], y + row * adjust[8] + adjust[2] ), Rect.new( x, y + row * adjust[8] + adjust[3], x + adjust[4], y + row * adjust[8] + adjust[5] ), 
+        nil, onClick, priority )
 end
 
 UI_Title = function( row, txt )
@@ -491,7 +511,7 @@ UI_HistoryList = class({
                 Render_History( ii, hh )
             end
         end
-        local x, y, b1, b2, b3, wheel = mouse(1)
+        local x, y, b1, b2, b3, wheel = mouseManager:getMouse( MOUSE_PRIORITY_SYSTEM )
         if keyp( KeyCode.Down ) or wheel < 0 then self.page = self.page + 1 end
         if keyp( KeyCode.Up ) or wheel > 0 then self.page = self.page - 1 end
         if self.page > self.totalPage then self.page = self.totalPage end

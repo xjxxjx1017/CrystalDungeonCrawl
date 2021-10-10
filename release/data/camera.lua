@@ -2,6 +2,8 @@ require 'code/class'
 require 'code/util'
 require 'code/keycode'
 
+ONE_SCREEN_GRID_COUNT = 24
+
 MainCamera = class({
     cameraLimitX = nil,
     cameraLimitY = nil,
@@ -12,7 +14,8 @@ MainCamera = class({
     end,
 
     reset = function(self)
-        local adjust = { ( MapTile_WH - 16 ) * 32 * - 0.5, 0, ( MapTile_WH - 16 ) * 32 * 0.5, ( MapTile_WH - 16 ) * 32 }
+        local adjust = { ( MapTile_WH - ONE_SCREEN_GRID_COUNT ) * 32 * - 0.5, 0, 
+            ( MapTile_WH - ONE_SCREEN_GRID_COUNT ) * 32 * 0.5, ( MapTile_WH - ONE_SCREEN_GRID_COUNT ) * 32 }
         local canvasWidth, canvasHeight = Canvas.main:size()        
         self.cameraLimitMin = Vec2.new( adjust[1], adjust[2] )
         self.cameraLimitMax = Vec2.new( adjust[3], adjust[4] )
@@ -37,6 +40,12 @@ MainCamera = class({
     gridToUIPos = function( self, x, y )
         local cx, cy = self:getCameraPos()
         return x - cx, y - cy
+    end,
+
+    uiToGridPos = function( self, x, y )
+        local cx, cy = self:getCameraPos()
+        -- printOnce('CameraPos', '', cx, cy )
+        return x + cx, y + cy
     end,
 
     update = function(self, delta)

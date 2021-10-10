@@ -1,7 +1,7 @@
 {
   "width": 32,
   "height": 32,
-  "count": 3,
+  "count": 8,
   "data": [
     {
       "x": 288,
@@ -26,6 +26,46 @@
       "height": 32,
       "interval": 0.25,
       "key": ""
+    },
+    {
+      "x": 736,
+      "y": 3008,
+      "width": 32,
+      "height": 32,
+      "interval": 0.2,
+      "key": "heal"
+    },
+    {
+      "x": 1280,
+      "y": 768,
+      "width": 32,
+      "height": 32,
+      "interval": 0.1,
+      "key": ""
+    },
+    {
+      "x": 1344,
+      "y": 768,
+      "width": 32,
+      "height": 32,
+      "interval": 0.1,
+      "key": ""
+    },
+    {
+      "x": 1408,
+      "y": 768,
+      "width": 32,
+      "height": 32,
+      "interval": 0.1,
+      "key": ""
+    },
+    {
+      "x": 1728,
+      "y": 992,
+      "width": 32,
+      "height": 32,
+      "interval": 0.3,
+      "key": "casting"
     }
   ],
   "ref": "res/ProjectUtumno_full.png"

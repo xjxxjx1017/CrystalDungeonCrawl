@@ -5,7 +5,7 @@ require 'code/keycode'
 
 Profile_OptionDefault = { }
 
-Profile_ProfileDefault = { dateCreated = nil, crystals = copy( CRYSTALS ), upgrades = {}, round = 0 }
+Profile_ProfileDefault = { dateCreated = nil, crystals = copy( CRYSTALS ), upgrades = {}, round = 0, playedTutorial = false }
 
 Profile_HistoryDefault = { dateCreated = nil, dateTimeFrom = nil, dateTimeTo = nil, round = nil,  killedBy = nil, crystal_gain = copy( CRYSTALS ), steps = 0, monster_kill = {}, equipments = {}, mode = nil, isWin = false }
 

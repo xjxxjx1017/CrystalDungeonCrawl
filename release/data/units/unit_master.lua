@@ -47,6 +47,24 @@ UnitMaster = class({
         else
             c.curLevel = -3
         end
+        -- assign maxHp value, if not assigned already
+        if c.hp > 0 and c.maxHp == 0 then
+            c.maxHp = c.hp
+        end
+
+        -- generate a random weapon
+        if c.pickup_equipment_random then
+            c.pickup_equipment = AllPickupEquipmentIds[ math.random(1, #AllPickupEquipmentIds) ]
+            local equip = FindEquipmentById( c.pickup_equipment )
+            c.img = equip.img
+        end
+        -- generate a random script
+        if c.pickup_script_random then
+            c.pickup_equipment = AllScriptEquipmentIds[ math.random(1, #AllScriptEquipmentIds) ]
+            local equip = FindEquipmentById( c.pickup_equipment )
+            c.img = equip.img
+            c.level = equip.level
+        end
 
         -- initialize parts if there's any
         local initedParts = {}
@@ -92,7 +110,7 @@ UnitMaster = class({
         local tx, ty = dsx + dx, dsy + dy
         if game.player ~= nil then
             self:reduceAngry()
-			if ( game.player:isInSight( tx, ty ) or game.player:isInSight( dsx, dsy ) ) then
+			if ( game.player:isInSight( tx, ty ) or game.player:isInSight( dsx, dsy ) ) and self.cfg.ai ~= AI_BLINK_ASSASIN then
                 -- play move animation if player can see this
                 -- game:createEffect( 'res/smoke_anime/', '', sx, sy, 1, 1 )
 	            self:animeMove(tx, ty )
@@ -132,6 +150,13 @@ UnitMaster = class({
                     self:selfDamaged( self.cfg.att_self_damage )
                 end
             end )
+        end
+    end,
+
+    actionHeal = function( self )
+		local x, y = self:getLogicPos()
+        if game.player:isInSight( x, y ) then
+            self:animeAttack( 'att_effect', 'casting', x, y, 0, 0, 1, 1 )    
         end
     end,
 
@@ -181,6 +206,14 @@ UnitMaster = class({
         else
             self.isShow = true
         end
+        if self.cfg.walked_on_damage then
+            local x, y = self:getLogicPos()
+            local p = game:isPlayer( x, y )
+            if p then 
+                self:info( 'actionShow - actionAttack' )
+                self:actionAttack( x, y )
+            end
+        end
     end,
 
     nextAction = function(self)
@@ -210,6 +243,13 @@ UnitMaster = class({
             self.cfg.stun = self.cfg.stun - 1
             self.cfg.curDx, self.cfg.curDy = 0, 0
             self:info( 'stun' )
+        end
+        if self.cfg.stepLoop > 0 then
+            self.cfg.curStep = self.cfg.curStep + 1
+            if self.cfg.curStep >= self.cfg.stepLoop then
+                self.cfg.curStep = 1
+            end
+            self:info( 'step '..self.cfg.curStep )
         end
         -- update trample and stun
         if self.cfg.att_trample <= 0 and self.cfg.stun == 0 then
@@ -256,7 +296,7 @@ UnitMaster = class({
         self:info( 'attacked att'..att .. 'att_effect_stun'..att_effect_stun )
         self.cfg.alarmed = true
         if self.cfg.owner == nil then
-            if self.cfg.hp > 0 then
+            if self.cfg.hp ~= nil and self.cfg.hp > 0 then
                 self:info( 'attacked'..att )
                 self.cfg.hp = self.cfg.hp - att
                 self.cfg.angry = self.cfg.angry + 1
@@ -269,6 +309,28 @@ UnitMaster = class({
         else
             -- if this is a part of a larger unit, the unit is attacked
             self.cfg.owner:attacked( att, att_effect_stun )
+        end
+    end,
+
+    healed = function( self, source, amount )
+        if self.cfg.owner == nil then
+			if self.cfg.hp == nil then
+			a = 0
+			end
+            if self.cfg.hp > 0 and self.cfg.hp < self.cfg.maxHp then
+                self:info( 'healed'..amount )
+                self.cfg.hp = self.cfg.hp + amount
+                local x, y = self:getLogicPos()
+                if game.player:isInSight( x, y ) then
+                    self:animeAttack( 'att_effect', 'heal', x, y, 0, 0, 1, 1 )    
+                end
+                if self.cfg.hp >= self.cfg.maxHp then
+                    self.cfg.hp = self.cfg.maxHp
+                end
+            end
+        else
+            -- if this is a part of a larger unit, the unit is attacked
+            self.cfg.owner:healed( source, amount )
         end
     end,
 
@@ -290,7 +352,7 @@ UnitMaster = class({
 
     steppedOn = function (self, x, y )
         self:info( 'steppedOn x'..x .. 'y'..y )
-        if self.cfg.walked_on_damage then
+        if self.cfg.walked_on_damage and self.isShow then
             self:actionAttack( x, y )
         end
     end,
@@ -308,6 +370,17 @@ UnitMaster = class({
             return self.cfg.att_terrain
         else
             return self.cfg.att
+        end
+    end,
+
+    removeRedBarrier = function( self )
+        self:info( 'redBarrierRemoved' )
+        self.cfg.red_barrier = 0
+        -- remove attackable status for pickup items
+        if self.cfg.is_pickup then 
+            self.cfg.can_player_attack = false 
+            self.cfg.blocking = false
+            self.cfg.hp = 0 
         end
     end,
 
@@ -353,40 +426,23 @@ UnitMaster = class({
             local allKeys = shuffle( CRYSTALS_COMMON )
             if self.cfg.crystal > 0 then
                 local ck = {}
-                if self.cfg.crystal_white == false then
-                    local primaryCrystal = 'crystal1'
-                    for k,v in pairs( game.weapon.cfg.recharge_cost ) do
-                        if v > 0 then primaryCrystal = k end
-                    end
-                    remove( allKeys, primaryCrystal )
-                    if self.cfg.is_boss then
-                        ck[allKeys[1]] = math.ceil( self.cfg.crystal / 3 )
-                        ck[allKeys[2]] = math.ceil( self.cfg.crystal / 3 )
-                        ck[allKeys[3]] = math.ceil( self.cfg.crystal / 3 )
+                if self.cfg.crystal_drop_only ~= nil then
+                    ck[self.cfg.crystal_drop_only] = self.cfg.crystal
+                elseif self.cfg.crystal_white == false then
+                    ck['crystal1'] = math.ceil( self.cfg.crystal * 0.5 )
+                    if game.weaponTemp == nil then
+                        ck['crystal_exp'] = self.cfg.crystal - ck['crystal1']
                     else
-                        if self.cfg.curLevel >= game.weapon.cfg.level + 4 then
-                            ck[primaryCrystal] = math.ceil( self.cfg.crystal * 0.5 )
-                            ck[allKeys[1]] = math.ceil( self.cfg.crystal * 0.5 )
-                        elseif self.cfg.curLevel >= game.weapon.cfg.level + 2 then
-                            ck[primaryCrystal] = math.ceil( self.cfg.crystal * 0.7 )
-                            ck[allKeys[1]] = math.ceil( self.cfg.crystal * 0.3 )
-                        elseif self.cfg.curLevel >= game.weapon.cfg.level then
-                            ck[primaryCrystal] = math.ceil( self.cfg.crystal * 0.9 )
-                            ck[allKeys[1]] = math.ceil( self.cfg.crystal * 0.1 )
-                        else
-                            ck[primaryCrystal] = math.ceil( self.cfg.crystal * 1 )
-                        end
+                        ck['crystal4'] = self.cfg.crystal - ck['crystal1']
+                    end
+                    local diff = self.cfg.curLevel - game.player.level
+                    if diff > 0 then
+                        ck['crystal_white'] = diff
                     end
                 else
                     ck['crystal_white'] = self.cfg.crystal
                 end
-                local nearestPot = game:findNearestPot( xx, yy )
-                if nearestPot ~= nil and self.cfg.crystal_white == false and (ck['crystal_white'] == 0 or ck['crystal_white'] == nil ) then
-                    Projectile_PotCollectCrystals( xx, yy, ck, nearestPot )
-                else
-                    warn( 'No existing pot found' )
-                    Projectile_DropCrystals( mapCfg.mox + 32 * xx + 16, mapCfg.moy + 32 * yy + 16, ck )
-                end
+                game:dropCrystal( xx, yy, ck )
             end
         end
         if self.cfg.crystal_collector and Crystals_sum( self.cfg.crystal_collected ) then
@@ -399,7 +455,7 @@ UnitMaster = class({
         if self.cfg.is_pickup then
             self:info( 'pickup' )
             if self.cfg.pickup_equipment ~= nil then
-                game:upgradeEquipment( FindEquipmentById( self.cfg.pickup_equipment ), true )
+                game:upgradeEquipment( FindEquipmentById( self.cfg.pickup_equipment ), true, false )
             end
             game:removeUnit( self )
         end
@@ -409,6 +465,18 @@ UnitMaster = class({
         if game.player == nil then return 0, 0 end
         -- check where's the player's relative position
         local plx, ply = game.player:getLogicPos()
+        local avrX, avrY = self:getLogicPos()
+        local ddx, ddy = plx - avrX, ply - avrY
+        if math.abs(ddx) - math.abs(ddy) > 0 or ( math.random() > 0.5 and math.abs(ddx) == math.abs(ddy) ) then
+            return ddx / math.abs(ddx), 0
+        else
+            return 0, ddy / math.abs(ddy)
+        end
+    end,
+
+    getAIPointDir = function( self )
+        if self.cfg.aiX == nil or self.cfg.aiY == nil then return self:getPlayerDir() end
+        local plx, ply = self.cfg.aiX, self.cfg.aiY
         local avrX, avrY = self:getLogicPos()
         local ddx, ddy = plx - avrX, ply - avrY
         if math.abs(ddx) - math.abs(ddy) > 0 or ( math.random() > 0.5 and math.abs(ddx) == math.abs(ddy) ) then
@@ -461,10 +529,10 @@ UnitMaster = class({
         local result = false 
         for k,v in ipairs( self.cfg.parts ) do
             local px, py = v:getLogicPos()
-            result = result or math.abs( px - x ) <= self.cfg.alarm_range and math.abs( py - y ) <= self.cfg.alarm_range
+            result = result or ( px - x )*( px - x ) + ( py - y ) * ( py - y ) <= self.cfg.alarm_range * self.cfg.alarm_range
         end
         local px, py = self:getLogicPos()
-        result = result or math.abs( px - x ) <= self.cfg.alarm_range and math.abs( py - y ) <= self.cfg.alarm_range
+        result = result or ( px - x )*( px - x ) + ( py - y ) * ( py - y ) <= self.cfg.alarm_range * self.cfg.alarm_range
         return result
     end,
 

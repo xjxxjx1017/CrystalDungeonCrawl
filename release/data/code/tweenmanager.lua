@@ -84,7 +84,7 @@ tweenManager = TweenManager.new()
 	After the tweens all finished, the update function will always return true, and the sprite no longer rendering
 
 	example:
-	tweenManager:addSpriteAnimeSequence( SpriteAnimeSequence.new( game.weapon.cfg.img, { 
+	tweenManager:addSpriteAnimeSequence( SpriteAnimeSequence.new( img, { 
 		{ target = { x = mapCfg.mox + px * 32 + dirX * 16, y = mapCfg.moy + py * 32 + dirY * 16, w = 32, h = 32, rotAngle = math.pi * 0 } }, 
 		{ duration = 1, easing = 'outExpo', target = { x = mapCfg.mox + px * 32 + dirX * 16, y = mapCfg.moy + py * 32 + dirY * 16, w = 32, h = 32, rotAngle = math.pi * -1 } } 
 	} ) )
@@ -128,7 +128,7 @@ TweenSequence = class({
 	After the tweens all finished, the update function will always return true, and the sprite no longer rendering
 
 	example:
-	tweenManager:addSpriteAnimeSequence( SpriteAnimeSequence.new( game.weapon.cfg.img, { 
+	tweenManager:addSpriteAnimeSequence( SpriteAnimeSequence.new( img, { 
 		{ target = { x = mapCfg.mox + px * 32 + dirX * 16, y = mapCfg.moy + py * 32 + dirY * 16, w = 32, h = 32, rotAngle = math.pi * 0 } }, 
 		{ duration = 1, easing = 'outExpo', target = { x = mapCfg.mox + px * 32 + dirX * 16, y = mapCfg.moy + py * 32 + dirY * 16, w = 32, h = 32, rotAngle = math.pi * -1 } } 
 	} ) )

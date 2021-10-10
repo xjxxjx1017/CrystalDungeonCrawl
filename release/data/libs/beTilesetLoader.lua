@@ -25,6 +25,7 @@ beTilesetLoader_readTileFamily = function( path, tile_family )
 	local tex = Resources.load( path..'/'..tile_family..'/'..tile_family..'.png')
 	local filepath = path..'/'..tile_family..'/'..tile_family..'.txt'
 	local bytes = Project.main:read( filepath )
+	bytes:poke(1)
 	local js = bytes:readString()
 	--print( 'loading...', '', js )
 	if js == '' or js == nil then 

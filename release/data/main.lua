@@ -2,7 +2,6 @@ require 'game'
 require 'ui_elements'
 require 'map_generator'
 require 'background'
-require 'analysis'
 require 'units/projectile'
 require 'camera'
 require 'profile'
@@ -17,7 +16,7 @@ DEBUG_MORE_CRYSTAL = false
 DEBUG_POSITION = false
 DEBUG_MAP = false
 DEBUG_WEAPON = false
-DEBUG_UNIT = true
+DEBUG_UNIT = false
 DEBUG_RENDER_ORDER = false
 DEBUG_FAST_MODE = false
 DEBUG_FRAME = false
@@ -27,7 +26,7 @@ DEBUG_UI_LAYOUT = false
 DEBUG_ANALYSIS_LEVEL = false
 DEBUG_ANALYSIS_ALL = false
 DEBUG_TILE = false 	-- 打印tile的role
-DEBUG_LEVEL = true -- 打印单位的等级情况
+DEBUG_LEVEL = false -- 打印单位的等级情况
 DEBUG_CONSOLE = false -- input some common through the UI ( e.g. to kill an unit )
 DEBUG_UNIT_GENERATE = false -- debug the unit generation logic, including level balance
 DEBUG_KEYS = true -- enable cheat keys
@@ -60,7 +59,7 @@ MainLoop = class({
 		-- initialize game basics
 		cls(Color.new(0,0,0))
 		math.randomseed(DateTime.ticks())
-		Canvas.main:resize(960, 640)
+		Canvas.main:resize(1366, 768)
         theme = customizedTheme.default()
 		font(lanapixel)
 
@@ -74,6 +73,7 @@ MainLoop = class({
 		-- preparing game content
 		profileManager:loadAll()
 		game:setup()
+		mouseManager:setup()
 
 		-- initialize main menu
 		self:changeState( 'mainmenu')
@@ -95,16 +95,14 @@ MainLoop = class({
 				mapCfg:reset( gamemode, 16 )
 				self.tilesMask = Resources.load( 'spr/background_mask.spr' )
 				self.tilesMask:play('idle', false, true, true)
-			elseif gamemode == 'gen1' then
-				mapCfg:reset( 'gen1', 16 )
+			elseif gamemode == 'gen2' then
+				mapCfg:reset( 'gen2', 24 )
 				self.tilesMask = Resources.load( 'spr/background_mask.spr' )
 				self.tilesMask:play('idle', false, true, true)
-			elseif gamemode == 'gen2' then
-				mapCfg:reset( 'gen2', 32 )
-				self.tilesMask = nil
 			end
 
 			bg:reset()
+			mouseManager:reset()
 			mapGenerator2:reset()
 			game:reset()
 		
@@ -119,6 +117,7 @@ MainLoop = class({
 	end,
 
 	update = function( self, delta )
+
 		if self.state == 'game' then  
 			if DEBUG_FRAME_RATE and delta > 0.1 then
 				warn('frame rate very low: '.. delta)
@@ -130,29 +129,44 @@ MainLoop = class({
 			-- render in game UI
 			local adjust = { 48, 160, 288, 50, 31, 78, 389 }
 			ui_itemDetail.curDetail = nil
-			if self.tilesMask ~= nil then
-				spr( self.tilesMask, 0, 0, 960, 640 )
-			end
-			tex( texUI_backdrop, 0, 0 )
+			-- if self.tilesMask ~= nil then
+			-- 	spr( self.tilesMask, 0, 0, 960, 640 )
+			-- end
+			-- tex( texUI_backdrop, 0, 0 )
 			UI_RenderCrystals( 16, 590, game.currency )
 			-- render current equipments on the left hand 
 			UI_Equipment_Render( adjust[1], adjust[2], 96, 96, game.shield.cfg, ui_pool:getRes( game.shield.cfg.img, 'idle' ), 3, 0, 1, 0, game.shield.cfg.energy_power, game.shield.cfg.energy_power_max )
-			UI_Equipment_Render( adjust[1], adjust[3], 96, 96, game.weapon.cfg, ui_pool:getRes( game.weapon.cfg.img, 'idle' ), 4, game.weapon.cfg.att, 0, 0, game.weapon.cfg.energy, game.weapon.cfg.energy_max )
+			if game.weaponTemp == nil then
+				UI_Equipment_Render( adjust[1], adjust[3], 96, 96, 
+					game:getWeapon().cfg, ui_pool:getRes( game:getWeapon().cfg.img, 'idle' ), 4, 
+					game:getWeapon().cfg.att, 0, 0, 0, 0 )
+			else
+				UI_Equipment_Render( adjust[1], adjust[3], 96, 96, 
+					game:getWeapon().cfg, ui_pool:getRes( game:getWeapon().cfg.img, 'idle' ), 4, 
+					game:getWeapon().cfg.att, 0, 0, game:getWeapon().cfg.energy, game:getWeapon().cfg.energy_max )
+				UI_Equipment_Render( adjust[1] + 96 + 32, adjust[3] + 64, 32, 32, 
+					game.weaponMain.cfg, ui_pool:getRes( game.weaponMain.cfg.img, 'idle' ), 4, 
+					0, 0, 0, 0, 0 )
+			end
 			if game.badge ~= nil then
 				UI_Equipment_Render( adjust[1], adjust[3] + 160, 96, 96, game.badge.cfg, ui_pool:getRes( game.badge.cfg.img, 'idle' ), 99, game.badge.cfg.level, 0, 0, game.badge.cfg.energy, game.badge.cfg.energy_max )
 			end
+			for k,v in ipairs( game.rune ) do
+				UI_Equipment_Render( adjust[1] + k * 32, adjust[3] + 160 + 96, 32, 32, 
+					v.cfg, ui_pool:getRes( v.cfg.img, 'idle' ), 99, 0, 0, 0, 0, 0, function()
+						game.player:actionUseItem( v )
+					end )
+			end
+			for k,v in ipairs( game.inventory ) do
+				UI_Equipment_Render( adjust[1] + k * 32, adjust[3] + 160 + 96 + 32, 32, 32, 
+					v.cfg, ui_pool:getRes( v.cfg.img, 'idle' ), 99, 0, 0, 0, 0, 0, function()
+						game.player:actionUseItem( v )
+					end )
+			end
 			tex( texUI_portrate, adjust[4], adjust[5], 96, 96 )
-			-- render the repair button
-			local x, y = adjust[6], adjust[7]
-			local recargeFullCost = Crystals_multiply( game.weapon.cfg.recharge_cost, game.weapon.cfg.energy_max - game.weapon.cfg.energy )
-			UI_Buy_Render( x, y, 2, 0, 7, 0, recargeFullCost, Crystals_canAfford( recargeFullCost ), true )
-			UI_Clickable( Rect.new( x, y, x + 64, y + 64 ), Rect.new( x, y + 32, x + 32, y + 32 + 3 ), nil, function()
-				print('充能')
-				game:chargeWeapon()
-				game.player.stun = game.player.stun + 3
-			end )
-			-- render the equipment list on the right hand
-			ui_itemList:render()
+			if ( game.player.cfg.extra_hp > 0 ) then text( 'HP+'..game.player.cfg.extra_hp, adjust[4] - 64, adjust[5] ) end
+			if ( game.player.cfg.extra_att > 0 ) then text( 'Att+'..game.player.cfg.extra_att, adjust[4] - 32, adjust[5] ) end
+			if ( game.player.cfg.hard_def > 0 ) then text( 'Death Prevent'..game.player.cfg.hard_def, adjust[4], adjust[5] ) end
 			-- render item details, if mouse is hovering any
 			ui_itemDetail:render()
 			self.ui3Root:update(theme, delta)
@@ -161,6 +175,10 @@ MainLoop = class({
 			projectileManager:update(delta)
 			projectileManager:render()
 			camera()
+		end
+
+		if #game.choices > 0 then
+			UI_Choices( game.choices )
 		end
 
 		local adjust = { 16, 590 }
@@ -207,15 +225,11 @@ MainLoop = class({
                 print('第二个模式 - 标准模式')
 				self:changeState( 'game', 'gen2' )
             end )
-            UI_MenuButton( 2, '第一代 - 大乱斗', function() 
-                print('第一代模式 - 大乱斗')
-				self:changeState( 'game', 'gen1' )
-            end )
-            UI_MenuButton( 3, '测试模式', function() 
+            UI_MenuButton( 2, '测试模式', function() 
                 print('第零个模式 - 测试模式')
 				self:changeState( 'game', 'test' )
             end )
-            UI_MenuButton( 4, '返回', function() 
+            UI_MenuButton( 3, '返回', function() 
 				self:changeState( 'mainmenu' )
             end )
             UI_RenderCrystals( adjust[1], adjust[2], profileManager.cfg.profile.crystals )

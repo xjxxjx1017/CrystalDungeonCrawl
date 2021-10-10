@@ -67,6 +67,27 @@ function AI_Wonder( self )
     end
 end
 
+function AI_WONDER_DIR_BACKANDFORTH( self )
+	think = function ()
+        -- if it's already moving
+        if self.cfg.curDx == 0 and self.cfg.curDy == 0 then
+            self.cfg.curDx, self.cfg.curDy = self:getAIPointDir()
+        end
+        return self.cfg.curDx, self.cfg.curDy
+	end
+    local x, y = think()
+    local xx, yy = self:getLogicPos()
+	x, y = xx+x, yy+y
+    self:info( 'AI_WONDER_DIR_BACKANDFORTH ' .. 'x'..x..'y'..y )
+    if game:getBlocked( x, y ) == nil then
+        self:info( 'actionMove' )
+        self:actionMove( x, y )
+    else
+        self.cfg.curDx, self.cfg.curDx = 0, 0
+		self.cfg.alarmed = false
+    end
+end
+
 function AI_Charge( self )
 	think = function ()
         -- if it's already moving
@@ -101,6 +122,33 @@ function AI_UnhideAttack( self )
             self:actionShow()
             self:actionAttack( game.player:getLogicPos() )
         end
+    end
+end
+
+function AI_HEAL_SURROUNDING( self )
+    if self.cfg.curStep == 1 then
+        self:info( 'AI_HEAL_SURROUNDING' )
+        for k,v in ipairs( adjust8 ) do
+            local ux, uy = self:getLogicPos()
+            local allUnits = game:getBoard( ux + v.x, uy + v.y )
+            for kk,vv in ipairs( allUnits ) do
+                vv:healed( self, self.cfg.att )
+            end
+        end
+        self:actionHeal()
+    end
+end
+
+function AI_ShowHide( self )
+    if self.isShow then
+        -- self:info( 'AI_ShowHide' )
+        -- local x, y = self:getLogicPos()
+        -- local p = game:isPlayer( x, y )
+        -- if p then 
+        --     self:info( 'actionAttack' )
+        --     self:actionShow()
+        --     self:actionAttack( x, y )
+        -- end
     end
 end
 
@@ -143,7 +191,7 @@ function AI_GANG_TRACKER(self)
         local x, y = self:getLogicPos()
         local units = game:getUnitsInRange( x, y, self.cfg.alarm_ally_range )
         for k,v in ipairs( units ) do
-            v.cfg.alarmed = true
+            v.cfg.alarmed = false
         end
         AI_CHASE_AND_ATTACK(self)
     end

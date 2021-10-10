@@ -56,6 +56,7 @@ end
 loadJson = function( filepath )
 	print( 'loading...', '', filepath )
 	local bytes = Project.main:read( filepath )
+	bytes:poke(1)
 	local js = bytes:readString()
 	-- print( 'loading...', '', js )
 	if js == '' or js == nil then 
@@ -120,6 +121,21 @@ end
 
 adjust8 = { {x = 0, y = -1}, {x = 1, y = -1}, {x = 1, y = 0}, {x = 1, y = 1}, {x = 0, y = 1}, {x = -1, y = 1}, {x = -1, y = 0}, {x = -1, y = -1} }
 adjust4 = { {x = 0, y = -1}, {x = 1, y = 0},{x = 0, y = 1}, {x = -1, y = 0} }
+
+
+getIndexByStep = function( iter, key, currenStep )
+	-- each step can have multiple counts ( or small steps to finish the step ), so we need to count the script index
+	local scriptIndex = 0
+	local maxStepCount = 0
+	for kkk,vvv in ipairs( iter ) do
+		maxStepCount = maxStepCount + vvv[key]
+		if maxStepCount >= currenStep and scriptIndex == 0 then
+			scriptIndex = kkk
+		end
+	end
+	-- 0 means maxed out
+	return scriptIndex
+end
 
 function copy(obj, seen)
     if type(obj) ~= 'table' then return obj end

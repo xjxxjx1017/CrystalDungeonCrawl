@@ -68,10 +68,10 @@ local expectedCrystalSum = {}   -- 玩家在每个关卡所需累计水晶曲线
 local sampleWeaponAtt = {}
 local sampleShieldEnergy = {}
 for i = 1, 20 do
-    local temp___sum_multi = 10
+    local temp___sum_multi = 10--[[
     table.insert( expectedCrystalSum, ( Crystals_sum( sampleWeapon[ expectedWeaponLevel[i] ].cost ) + Crystals_sum( sampleShield[ expectedShieldLevel[i] ].cost ) ) * temp___sum_multi )
     table.insert( sampleWeaponAtt, sampleWeapon[ expectedWeaponLevel[i] ].att )
-    table.insert( sampleShieldEnergy, sampleShield[ expectedShieldLevel[i] ].energy_power_max )
+    table.insert( sampleShieldEnergy, sampleShield[ expectedShieldLevel[i] ].energy_power_max )]]
 end
 
 local expectedTotalRiskLevel = { 20 ,50 , 75 ,75 ,100 , 85 ,85 ,150 , 100 ,120 ,120 ,200 , 200 ,200 ,200 ,400 , 300 ,300 ,300 ,800  }

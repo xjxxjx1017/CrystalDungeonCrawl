@@ -3,18 +3,19 @@ require 'code/co'
 require 'code/util'
 
 MapTile_WH = 16
-totalH = 640
-totalW = 960
+totalH = 768
+totalW = 1366
 tileSize = 32
 
-tileCountNoCamera= 16
+tileCountNoCamera= 24
 margin = 8 
 lineHeight = 30
 mapPaddingW = 70
-mapPaddingH = tileSize * 2
+mapPaddingH = tileSize * 0
 mapOffsetXNoCamera = totalW / 2 - tileSize * tileCountNoCamera / 2
 mapOffsetYNoCamera = mapPaddingH
 btnWUnit = 80
+roomCount = 3
 
 MapCfg = class({
     mapOffsetX = 0,
@@ -35,7 +36,7 @@ MapCfg = class({
         self.mapOffsetX = totalW / 2 - tileSize * MapTile_WH / 2
         self.mox = mapCfg.mapOffsetX
         self.moy = mapPaddingH
-        if MapTile_WH == 32 then
+        if MapTile_WH == 24 then
             self.background = 'level/background002.map'
         elseif MapTile_WH == 16 then
             self.background = 'level/background001.map'
@@ -77,30 +78,30 @@ Generate_MapOverlay = function()
         }
     ]]
     local rooms = {}
-    for ii = 1,4 do    -- x
+    for ii = 1,roomCount do    -- x
 		local row = {}
-    	for jj = 1,4 do        -- y
+    	for jj = 1,roomCount do        -- y
             table.insert( row, merge( MapOverlayDefault, {
-                id = (jj-1) * 4 + ii,
-                level = 5 - jj,
-                rfloor = 5 - jj
+                id = (jj-1) * roomCount + ii,
+                level = roomCount + 1 - jj,
+                rfloor = roomCount + 1 - jj
             } ))
         end
 		table.insert( rooms, row )
     end
     -- setup boss and player room
-    local stR = Vec2.new( math.random(1,4), 4 )
+    local stR = Vec2.new( math.random(1,roomCount), roomCount )
     local edR = Vec2.new( -1, 1 )
-    local curFloor = 4
+    local curFloor = roomCount
     local curX = stR.x
     local curDir = 1
-    if stR.x == 4 or math.random() > 0.5 then curDir = -1 end
+    if stR.x == roomCount or math.random() > 0.5 then curDir = -1 end
     if stR.x == 1 then curDir = 1 end
     while curFloor > 0 do
         local curRoom = rooms[curX][curFloor]
         local isDrop = curRoom.isDownThrough == false and math.random() > 0.67 and not( curX == stR.x and curFloor == stR.y )
         local nextRoomP = Vec2.new( curDir + curX, curFloor )
-        if nextRoomP.x < 1 or nextRoomP.x > 4 then isDrop = true end
+        if nextRoomP.x < 1 or nextRoomP.x > roomCount then isDrop = true end
         if isDrop then
             nextRoomP = Vec2.new( curX, curFloor - 1 )
         end
@@ -117,7 +118,7 @@ Generate_MapOverlay = function()
             if isDrop then
                 curRoom.isUpThrough = true
                 nextRoom.isDownThrough = true
-                if nextRoomP.x == 1 or nextRoomP.x == 4 or math.random() > 0.5 then
+                if nextRoomP.x == 1 or nextRoomP.x == roomCount or math.random() > 0.5 then
                     curDir = curDir * -1
                 end
             elseif curDir < 0 then
@@ -134,10 +135,10 @@ Generate_MapOverlay = function()
             curX, curFloor = nextRoomP.x, nextRoomP.y
         end
     end
-    for jj = 1,4 do        -- y
+    for jj = 1,roomCount do        -- y
         -- choose only one room in a level to be a secret room
         local allPossibleSecret = {}
-        for ii = 1,4 do    -- x
+        for ii = 1,roomCount do    -- x
             local r = rooms[ii][jj]
             if r.isPassage == false then 
                 table.insert( allPossibleSecret, r )
@@ -149,9 +150,9 @@ Generate_MapOverlay = function()
 	        allPossibleSecret[1].level = allPossibleSecret[1].level + 2
 		end
     end
-    for ii = 1,4 do
+    for ii = 1,roomCount do
         local p = ''
-        for jj = 1,4 do   
+        for jj = 1,roomCount do   
 			local curR = rooms[jj][ii]
 			if curR.isBoss then p = p .. ' B'
 			elseif curR.isPlayer then p = p.. ' P'
@@ -212,7 +213,11 @@ MapGenerator2 = class({
             -- is player
             local key = ''
             if level.fieldInstances[5].__value then
-                key = 'player'
+                if level.fieldInstances[8].__value then
+                    key = 'tutorial_player'
+                else
+                    key = 'player'
+                end
             -- is boss
             elseif level.fieldInstances[4].__value then
                 key = 'boss'
@@ -286,8 +291,8 @@ MapGenerator2 = class({
             -- 所有的地块都叠加在一起
             local overlay = Generate_MapOverlay()
             local allRooms = {}
-            for ii = 1,4 do
-                for jj = 1,4 do
+            for ii = 1,roomCount do
+                for jj = 1,roomCount do
                     local curRoom = {
                         level = nil,
                         rotate = 0,
@@ -301,7 +306,12 @@ MapGenerator2 = class({
                     if r.isBoss then
                         curRoom.level = selectRandomObjByWeight( self.levels['boss'], 'weight' )
                     elseif r.isPlayer then
-                        curRoom.level = selectRandomObjByWeight( self.levels['player'], 'weight' )
+                        if profileManager.cfg.profile.round > 1 and not profileManager.cfg.profile.playedTutorial then
+                            curRoom.level = selectRandomObjByWeight( self.levels['tutorial_player'], 'weight' )
+                            profileManager.cfg.profile.playedTutorial = true
+                        else
+                            curRoom.level = selectRandomObjByWeight( self.levels['player'], 'weight' )
+                        end
                     else
                         curRoom.level = selectRandomObjByWeight( self.levels['8x8'], 'weight' )
                         curRoom.rotate = math.random(0,3)

@@ -227,9 +227,8 @@ Projectile_PotCollectCrystals = function( xx, yy, crystals, nearestPot )
                         proj:setAccept( Vec2.new( nxx, nyy ), adjust[4], adjust[2], function( p )
                             nearestPot.cfg.crystal_collected[k] = nearestPot.cfg.crystal_collected[k] + 1
                         end )
-						local xm, ym = mouse(1)
-						local cx, cy = mainCamera:getCameraPos()
-						print( '#', '', xx, yy, px, py, axx, ayy, nxx, nyy, mapCfg.mox + 32 * px + 16, mapCfg.moy + 32 * py + 1, xm, ym, cx, cy )
+						-- local cx, cy = mainCamera:getCameraPos()
+						-- print( '#', '', xx, yy, px, py, axx, ayy, nxx, nyy, mapCfg.mox + 32 * px + 16, mapCfg.moy + 32 * py + 1, cx, cy )
                     end)
 					total = total + 1
                 end

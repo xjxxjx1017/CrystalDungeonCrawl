@@ -9,6 +9,8 @@ require 'units/unit_master'
 require 'units/effect'
 require 'equipments/equipment_def'
 require 'equipments/equipment'
+require 'mousemanager'
+
 
 Game = class({
     curUnitList = {},
@@ -28,17 +30,27 @@ Game = class({
     whitestar = nil,
     blind = nil,
 
+    pather = nil,
+    waitForAction = true,
+
     disableRange = 7,
-    invisibleRange = 16,
+    invisibleRange = 24,
+    raycaster = Raycaster.new(),
 
     turn = 1,
 
     board = {},
 
     currency = copy( CRYSTALS ),
-    weapon = Equipment.new( EQUIPMENT_DEFAULT ),
+    weaponMain = Equipment.new( EQUIPMENT_DEFAULT ),    -- 玩家的本命武器
+    weaponTemp = nil,                                   -- 玩家的临时武器
+    weaponEnhance = Equipment.new( EQUIPMENT_DEFAULT ), -- 玩家属性对任何装备中武器的加成
     shield = Equipment.new( EQUIPMENT_DEFAULT ),
     badge = nil,
+    inventory = {},
+    inventory_max = 48,
+    rune = {},
+    rune_max = 2,
     craftedEquipments = {},
 
     history = copy( Profile_HistoryDefault ),
@@ -47,6 +59,9 @@ Game = class({
     gamemode = 'test', -- 'test', 'gen1', 'gen2'
     lastgamemode = nil,
     gameFinished = false,
+
+    choices = {},
+    choicesTitle = '',
 
     ctor = function( self )
     end,
@@ -219,7 +234,7 @@ Game = class({
                 }
                 for kkk,field in ipairs( entity.fieldInstances ) do
                     if field.__type == "Point" then
-                        createCfg.cfg[field.__identifier] = { x = field.__value.cx, y = field.__value.cy }
+                        createCfg.cfg[field.__identifier] = { x = field.__value.cx + v.x, y = field.__value.cy + v.y }
                     end
                 end
                 if layout ~= nil then createCfg.level = layout.level end
@@ -253,10 +268,14 @@ Game = class({
             -- 如果是secret的房间，则在可以移动的tile上放上壶
             if layout ~= nil and layout.isSecretRoom then
                 addUnitInThisRoom( 'SMOKING_POT1' )
+                addUnitInThisRoom( 'SCRIPT' )
             end
             -- 任意房间都会被放上一个蓝色的回复道具 (BLUE_COIN)
             if layout ~= nil and layout.isPlayer == false then
-                addUnitInThisRoom( 'BLUE_COIN' )
+                if math.random() > 0.25 then addUnitInThisRoom( 'BLUE_COIN' ) end
+                if math.random() > 0.5 then addUnitInThisRoom( 'RANDOM_WEAPON' ) end
+                addUnitInThisRoom( 'SCRIPT' )
+                if math.random() > 0.5 then addUnitInThisRoom( 'SCRIPT' ) end
             end
         end
 
@@ -290,7 +309,13 @@ Game = class({
 			end
             -- 附加等级直接从等级表里随机选取
             -- UnitFactory_CreateUnit( id, x, y, true, 1, tCfg.level + expectedLevelList[math.random(1,#expectedLevelList)] - 1, nil )
-            UnitFactory_CreateUnit( id, x, y, true, 1, tCfg.level, nil )
+            local overwriteCfg = {}
+            -- convert LDTK configs to CH configs
+            if tCfg.cfg['AI_Point'] ~= nil then
+                local p = tCfg.cfg['AI_Point']
+                overwriteCfg = { aiX = p.x, aiY = p.y }
+            end
+            UnitFactory_CreateUnit( id, x, y, true, 1, tCfg.level, nil, overwriteCfg )
 		end
         for i = 1, map.w do
             for j = 1, map.h do
@@ -323,17 +348,25 @@ Game = class({
         self.blind:play('idle', false, true, true)
         -- initialize profiles
         game.currency = copy( profileManager.cfg.profile.crystals )
+        game.currency.crystal_exp = 0
         -- initialize equipments
-        game:upgradeEquipment( FindEquipmentById('剑1'), true )
-        game:upgradeEquipment( FindEquipmentById('护盾1'), true  )
+        game:upgradeEquipment( EQUIPMENT_WHITE_SWORD, true, true )
+        game:upgradeEquipment( FindEquipmentById('护盾1'), true, true  )
     end,
 
     reset = function( self )
+        self.raycaster.tileSize = Vec2.new( 32, 32 )
+        self.raycaster.offset = Vec2.new( mapCfg.mox, mapCfg.moy )
+        self.pather = Pathfinder.new(0, 0, MapTile_WH * MapTile_WH - 1, MapTile_WH * MapTile_WH - 1) -- Create a pathfinder object.
+        self.pather.diagonalCost = -1
         -- reset equipments
         self.craftedEquipments = {}
-        game:upgradeEquipment( FindEquipmentById(self.weapon.cfg.baseweapon), true )
-        game:upgradeEquipment( FindEquipmentById('护盾1'), true  )
-        self.weapon.cfg.energy = self.weapon.cfg.energy_max
+        game:upgradeEquipment( EQUIPMENT_WHITE_SWORD, true, true )
+        game:upgradeEquipment( FindEquipmentById('护盾1'), true, true  )
+        game.weaponTemp = nil
+        game.badge = nil
+        game.inventory = {}
+        game.rune = {}
         -- clear the existing stage
         self:clear()
         -- setup profile and history
@@ -357,8 +390,12 @@ Game = class({
     end,
 
     gameLoop = function(self, delta)
+        -- clear path finder
+        self.pather:clear()
+
         -- update unit animations and check whether all their turn has finished
         local turnFinished = true
+        self.waitForAction = false
         local hasNextAction = false
 		if self.player ~= nil then
 	        self.player:update( delta )
@@ -379,6 +416,8 @@ Game = class({
 	            hasNextAction = self.player:nextAction()
 	            if not ( hasNextAction ) then
 	                -- if the player has no action to perform, then all other units will stand by wait for the player
+                    -- show mouse position and player move direction hint
+                    self.waitForAction = true
 	            else
                     if DEBUG_RENDER_ORDER then for k,v in ipairs( game.curUnitList ) do v:info( '#render#' ) end end
                     print( '--------------------- turn ' .. self.turn .. ' ---------------------' )
@@ -397,6 +436,25 @@ Game = class({
         end
     end,
 
+    findPath = function ( self, vStart, vEnd )
+        found = pather:solve( vStart, vEnd,
+            function (pos)
+                local c = self:getBlocked( pos.x, pos.y )
+                if c then return 1 else return -1 end
+            end
+        )
+    end,
+
+    isRayBlocked = function (self, realPosStart, realPosEnd )
+        local intersectionPos, intersectionIdx = raycaster:solve(
+            realPosStart, realPosEnd - realPosStart,
+            function (pos)
+                local c = self:getBlocked( pos.x, pos.y )
+                return c
+            end
+        )
+    end,
+
     update = function (self, delta)
 
         if DEBUG_KEYS then
@@ -407,7 +465,7 @@ Game = class({
                 E： 装备至该关卡标准
             ]]
             if keyp(KeyCode.A) then
-                local xx, yy = mouse(1)
+                local xx, yy = mouseManager:getMouse( MOUSE_PRIORITY_DEBUG )
                 print( '', '', xx, yy )
             end
             if keyp(KeyCode.R) then
@@ -429,19 +487,12 @@ Game = class({
                 print('', '切换地图等级，等级'..self.currentMapIndex)
             end
             if keyp(KeyCode.E) then
-                game:upgradeEquipment( FindEquipmentById('护盾10'), true  )
-                game:upgradeEquipment( FindEquipmentById('弓箭10'), true  )
-                --[[
-                    local weapon, shield = Analysis_Level_Equipments( self.currentMapIndex )
-                    self:upgradeEquipment( FindEquipmentById(weapon), true )
-                    self:upgradeEquipment( FindEquipmentById(shield), true )
-                    game.player:changeState()
-                    print('', '切换玩家装备到预期，等级'..self.currentMapIndex)
-                ]]
+                game:upgradeEquipment( FindEquipmentById('护盾10'), true, true  )
+                game:upgradeEquipment( FindEquipmentById('弓箭10'), true, true  )
             end
             if keyp(KeyCode.D) then
                 -- firing a dropping crystal
-                local xx, yy = mouse(1)
+                local xx, yy = mouseManager:getMouse( MOUSE_PRIORITY_DEBUG )
                 Projectile_DropCrystals( xx, yy, { crystal1 = 10 } )
             end
             if keyp(KeyCode.P) then
@@ -449,28 +500,28 @@ Game = class({
             end
             if keyp(KeyCode.Num1) then
                 -- firing a dropping crystal
-                local xx, yy = mouse(1)
+                local xx, yy = mouseManager:getMouse( MOUSE_PRIORITY_DEBUG )
                 Projectile_DropCrystals( xx, yy, { crystal1 = 10 } )
             end
             if keyp(KeyCode.Num2) then
                 -- firing a dropping crystal
-                local xx, yy = mouse(1)
+                local xx, yy = mouseManager:getMouse( MOUSE_PRIORITY_DEBUG )
                 Projectile_DropCrystals( xx, yy, { crystal2 = 10 } )
             end
             if keyp(KeyCode.Num3) then
                 -- firing a dropping crystal
-                local xx, yy = mouse(1)
-                Projectile_DropCrystals( xx, yy, { crystal3 = 10 } )
+                local xx, yy = mouseManager:getMouse( MOUSE_PRIORITY_DEBUG )
+                Projectile_DropCrystals( xx, yy, { crystal_exp = 10 } )
             end
             if keyp(KeyCode.Num4) then
                 -- firing a dropping crystal
-                local xx, yy = mouse(1)
+                local xx, yy = mouseManager:getMouse( MOUSE_PRIORITY_DEBUG )
                 Projectile_DropCrystals( xx, yy, { crystal4 = 10 } )
             end
             if keyp(KeyCode.S) and key(KeyCode.LCtrl) then
                 profileManager:saveAll()
             elseif keyp(KeyCode.S) then
-                game.weapon.cfg.sight = game.weapon.cfg.sight + 10
+                game.weaponEnhance.cfg.sight = game.weaponEnhance.cfg.sight + 10
             end
             if keyp(KeyCode.L) and key(KeyCode.LCtrl) then
                 profileManager:loadAll()
@@ -494,7 +545,7 @@ Game = class({
             if keyp(KeyCode.M) then
                 self.currency.crystal1 = self.currency.crystal1 + 50
                 self.currency.crystal2 = self.currency.crystal2 + 30
-                self.currency.crystal3 = self.currency.crystal3 + 20
+                self.currency.crystal_exp = self.currency.crystal_exp + 20
                 self.currency.crystal4 = self.currency.crystal4 + 10
                 self.currency.crystal_white = self.currency.crystal_white + 10
                 game.player:changeState()
@@ -546,9 +597,11 @@ Game = class({
 		if self.player ~= nil then
         	self.player:render( delta )
             local px, py = self.player:getRenderPos()
-            self.weapon:render( px, py, 32 * 0.5, 32 * 0, 0.5, math.pi * 0)
+            self:getWeapon():render( px, py, 32 * 0.5, 32 * 0, 0.5, math.pi * 0)
 		end
 
+        --[[
+            -- recover by seen grid
         if game.shield.cfg.energy_power < game.shield.cfg.energy_power_max then
             for k, v in ipairs( newlySeenGrid ) do
                 local pos = mysplit( v )
@@ -557,6 +610,7 @@ Game = class({
                 Projectile_DropShield( posX, posY, 1, amount )
             end
         end
+        ]]
 
         tweenManager:render()
 
@@ -564,14 +618,17 @@ Game = class({
             v:render( delta )
         end
 
+        camera()
+        mouseManager:update( delta )
+
         if self.uiDirty then
             mainLoop:updateCraftPanel(false)
             self.uiDirty = false
         end
     end,
 
-    upgradeEquipment = function ( self, equipDef, isFree )
-        print('打造 ' .. equipDef.desc) 
+    upgradeEquipment = function ( self, equipDef, isFree, isMain )
+        print('打造 ' .. equipDef.id) 
         isFree = isFree == true or false
         local n = Equipment.new( equipDef )
         local lastEquipment = ''
@@ -581,13 +638,15 @@ Game = class({
         end
         self:unlockEquipment( n.cfg.id )
         if equipDef.etype == 'weapon' then
-            self.weapon:info( 'upgradeEquipment:Old' )
-            local used = self.weapon.cfg.energy_max - self.weapon.cfg.energy
-            self.weapon = n
-            self.weapon.cfg.energy = self.weapon.cfg.energy_max - used
-			-- below code can fix ui problem and create game hacks
-			-- if self.weapon.cfg.energy < 0 then self.weapon.cfg.energy = 0 end
-            self.weapon:info( 'upgradeEquipment:NewAdjusted' )
+            if isMain then
+                self.weaponMain:info( 'upgradeEquipment:Old' )
+                self.weaponMain = n
+                self.weaponMain:info( 'upgradeEquipment:NewAdjusted' )
+            else
+                if self.weaponTemp ~= nil then self.weaponTemp:info( 'upgradeEquipment:Old' ) end
+                self.weaponTemp = n
+                self.weaponTemp:info( 'upgradeEquipment:NewAdjusted' )
+            end
         elseif equipDef.etype == 'shield' then
             self.shield:info( 'upgradeEquipment:Old' )
             local used = self.shield.cfg.energy_power_max - self.shield.cfg.energy_power
@@ -603,6 +662,14 @@ Game = class({
             self.badge = n
             self.badge.cfg.energy = self.badge.cfg.energy_max - used
             self.badge:info( 'upgradeEquipment:NewAdjusted' )
+        elseif equipDef.etype == 'script' then
+            if game.inventory_max > #game.inventory then
+                table.insert( self.inventory, n )
+            end
+        elseif equipDef.etype == 'rune' then
+            if game.rune_max > #game.rune then
+                table.insert( self.rune, n )
+            end
         end
     end,
 
@@ -612,8 +679,43 @@ Game = class({
         end
     end,
 
+    getWeapon = function( self )
+        local rlt
+        if game.weaponTemp == nil then
+            rlt = copy( game.weaponMain )
+        else
+            rlt = copy( game.weaponTemp )
+        end
+        rlt.cfg.sight = rlt.cfg.sight + game.weaponEnhance.cfg.sight
+        if rlt.cfg.energy_max > 0 then
+            rlt.cfg.energy_max = rlt.cfg.energy_max + game.weaponEnhance.cfg.energy_max
+        end
+        rlt.cfg.att = rlt.cfg.att + game.weaponEnhance.cfg.att
+        rlt.cfg.recharge_cost = Crystals_add( rlt.cfg.recharge_cost, game.weaponEnhance.cfg.recharge_cost )
+        rlt.cfg.att_cost = Crystals_add( rlt.cfg.att_cost, game.weaponEnhance.cfg.att_cost )
+        return rlt
+    end,
+
+    setWeapon = function( self, attr, value )
+        if game.weaponTemp == nil then
+            game.weaponMain.cfg[attr] = value
+        else
+            game.weaponTemp.cfg[attr] = value
+        end
+    end,
+
     filterEquipmentByCrafted = function( self )
         return FilterEquipmentByCrafted( self.craftedEquipments )
+    end,
+
+    dropCrystal = function( self, xx, yy, ck )
+        local nearestPot = game:findNearestPot( xx, yy )
+        if nearestPot ~= nil then
+            Projectile_PotCollectCrystals( xx, yy, ck, nearestPot )
+        else
+            warn( 'No existing pot found' )
+            Projectile_DropCrystals( mapCfg.mox + 32 * xx + 16, mapCfg.moy + 32 * yy + 16, ck )
+        end
     end,
 
     searchAdjustMap = function ( self, m, id, x, y )
@@ -714,16 +816,17 @@ Game = class({
     end,
 
     isInCamera = function(self, v)
-        local rx, ry = v:getRealPos()
-        local cx, cy = mainCamera:getCameraPos()
-        return rx >= cx - 32 and rx <= cx + 960 + 32 and ry >= cy - 32 and ry <= cy + 640 + 32
+        return true
+        -- local rx, ry = v:getRealPos()
+        -- local cx, cy = mainCamera:getCameraPos()
+        -- return rx >= cx - 32 and rx <= cx + 960 + 32 and ry >= cy - 32 and ry <= cy + 640 + 32
     end,
     
     isPlayer = function ( self, x, y )
         local px, py = self.player:getLogicPos()
         return px == x and py == y
     end,
-        
+    
     removeUnit = function ( self, vv )
         if vv.cfg.is_static then
             remove( self.curStaticUnitList, vv )
@@ -762,7 +865,7 @@ Game = class({
         for k,v in ipairs( self.curCrystalCollectorList ) do
             local xx, yy = v:getLogicPos()
             local l = (x-xx)*(x-xx) + (y-yy)*(y-yy)
-            if minLength > l then
+            if minLength > l and v.cfg.collector_range * v.cfg.collector_range >= l then
                 minLength = l
                 minUnit = v
             end
@@ -822,15 +925,6 @@ Game = class({
     end,
     
     chargeWeapon = function (self)
-        local dx = self.weapon.cfg.energy_max - self.weapon.cfg.energy
-        local primary = Crystals_getPrimary( self.weapon.cfg.recharge_cost )
-        
-        if self.currency[primary] < dx then
-            dx = self.currency[primary]
-        end
-        self.weapon.cfg.energy = self.weapon.cfg.energy + dx
-        self.currency[primary] = self.currency[primary] - dx
-        self.player:changeState()
     end,
     
     createEffect = function ( self, img, state, x, y, dx, dy, wM, hM, callback )
@@ -847,12 +941,16 @@ Game = class({
 
     curAtt = function (self, blocker)
         local att_total = -1
+        local bonus_att = 0
+        if game.player.cfg.extra_att > 0 then bonus_att = bonus_att + game.player.cfg.extra_att end
         if blocker.cfg.is_terrain then
-            att_total = self.weapon.cfg.att_terrain
-        elseif self.weapon.cfg.energy > 0 then
-            att_total = self.weapon.cfg.att
+            att_total = self:getWeapon().cfg.att_terrain
+        elseif self:getWeapon().cfg.energy > 0 then
+            att_total = self:getWeapon().cfg.att + bonus_att
+            game.player.cfg.extra_att = 0
         else
-            att_total = self.weapon.cfg.att
+            att_total = self:getWeapon().cfg.att + bonus_att
+            game.player.cfg.extra_att = 0
         end
         return att_total
     end,

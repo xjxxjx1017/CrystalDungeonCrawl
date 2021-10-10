@@ -76,9 +76,15 @@ Object = class({
 		self.xOffset = xOffset
 		self.yOffset = yOffset
 		if self.cfg.img ~= nil and self.cfg.tile_family == nil then
-			imgSrc = 'spr/' .. self.cfg.img ..  '.spr'
+			local imgSrc = self.cfg.img
+			if self.cfg.pickup_equipment == nil then
+				imgSrc = 'spr/' .. self.cfg.img ..  '.spr'
+			end
 			-- self.spr_ = sprPool:getRes( imgSrc, 'idle' )
 			self.spr_ = Resources.load(imgSrc)
+			if self.spr_ == nil then
+			a = 0
+			end
 			self.spr_:play('idle', false, true, true)
 		end
 		-- if self.cfg.curLevel > 0 or self.cfg.curLevel < 11 then
@@ -151,20 +157,21 @@ Object = class({
 				UI_ShowNumber( sprX + 13, sprY + 13, role, 1 )
 			end
 		end
-		if self.cfg.crystal_collector then
+		if self.cfg.pickup_equipment then
+			-- UI_ShowNumber( sprX + 20, sprY + 23, self.cfg.level, 1 )
+			-- local eq = FindEquipmentById( self.cfg.pickup_equipment )
+			-- text( eq.desc, sprX + 4, sprY + 16 )
+		elseif self.cfg.crystal_collector then
 			local color = self:getLevelColor()
 			tex( txtBank7, sprX, sprY, 32, 32, 32 * 15, 0, 32, 32 )
 			UI_ShowNumber( sprX + 3, sprY + 23, Crystals_sum( self.cfg.crystal_collected ), 1 )
-			UI_ShowNumber( sprX + 20, sprY + 23, self.cfg.hp, 1, color )
+			UI_ShowNumber( sprX + 20, sprY + 23, self.hp, 1, color )
 		elseif self.cfg.is_boss or self.cfg.owner ~= nil then
 		elseif self == game.player then
 			-- tex( txtBank7, sprX, sprY, 32, 32, 32 * 13, 0, 32, 32 )
 			-- local color = COLOR_WHITE
-			-- if game.weapon.cfg.energy < game.weapon.cfg.energy_max * 0.5 then color = COLOR_ORANGE end
-			-- if game.weapon.cfg.energy < game.weapon.cfg.energy_max * 0.25 then color = COLOR_RED end
-			-- UI_ShowNumber( sprX + 3, sprY + 23, game.weapon.cfg.att, 1, color )
+			-- UI_ShowNumber( sprX + 3, sprY + 23, game:getWeapon().cfg.att, 1, color )
 			-- local color = COLOR_WHITE
-			-- if game.shield.cfg.energy_power < game.shield.cfg.energy_power_max * 0.25 then color = COLOR_RED end
 			-- UI_ShowNumber( sprX + 20, sprY + 23, game.shield.cfg.energy_power, 1, color )
 		elseif self.cfg ~= nil and self.cfg.att ~= nil and self.cfg.is_terrain ~= nil and self.cfg.att > 0 and self.cfg.is_terrain == false then
 			local color = self:getLevelColor()
@@ -179,6 +186,14 @@ Object = class({
 		elseif self.cfg ~= nil and self.cfg.is_terrain == false and self.cfg.is_pickup == false and self.cfg.can_player_attack then
 			tex( txtBank7, sprX, sprY, 32, 32, 32 * 15, 0, 32, 32 )
 			UI_ShowNumber( sprX + 20, sprY + 23, self.cfg.hp, 1 )
+		end
+		if self.cfg.red_barrier > 0 then
+			circ( sprX + 16, sprY + 32, 16, false, Color.new(255, 0, 0) )
+			UI_ShowNumber( sprX + 20, sprY + 23, self.cfg.red_barrier, 1, COLOR_RED )
+		end
+		if DEBUG_TILE then
+			UI_ShowNumber( sprX + 3, sprY + 23, self.x1, 1, COLOR_RED )
+			UI_ShowNumber( sprX + 20, sprY + 23, self.y1, 1, COLOR_RED )
 		end
 		if DEBUG_POSITION then
 			rect(
@@ -202,11 +217,11 @@ Object = class({
 				return Color.new( 255, 0, 0 )
 			else
 				level = self.cfg.curLevel
-				if self.cfg.curLevel >= game.weapon.cfg.level + 4 then
+				if self.cfg.curLevel >= game.player.level + 4 then
 					return Color.new( 255, 0, 0 )
-				elseif self.cfg.curLevel >= game.weapon.cfg.level + 2 then
+				elseif self.cfg.curLevel >= game.player.level + 2 then
 					return Color.new( 255, 100, 0 )
-				elseif self.cfg.curLevel >= game.weapon.cfg.level then
+				elseif self.cfg.curLevel >= game.player.level then
 					return Color.new( 255, 255, 0 )
 				else
 					return Color.new( 0, 255, 0 )

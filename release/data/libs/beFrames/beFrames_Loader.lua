@@ -65,6 +65,7 @@ local load = function (dir, ext)
 	for k, frame in ipairs(frames) do
 		-- Read a frame.
 		local bytes = Project.main:read(frame)
+		bytes:poke(1)
 		local img = Image.new()
 		img:fromBytes(bytes)
 		-- Check frame size.
